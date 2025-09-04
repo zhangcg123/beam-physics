@@ -1,0 +1,641 @@
+!----------------------------------------------------------------------------------
+!
+! requirement: SAD Ver.1.0.10.6.15k64 or newer
+!
+!----------------------------------------------------------------------------------
+!
+! Chang Log
+!
+!----------------------------------------------------------------------------------
+
+
+  !----------------------------------------------------------------------------------
+  ! Functions as defined in MATHEMATICA 
+  !----------------------------------------------------------------------------------
+  
+  !
+  ! ArrayFlatten[{{m11,m12,...},{m21,m22,...},...}]
+  ! creates a single flattened matrix from a matrix of matrices
+  ! doesn't work with Flatten in SAD
+  !ArrayFlatten[list_] := Module[
+  !  {listnew},
+  !  listnew=Flatten[list, {{1, 3}, {2, 4}}];
+  ! 	Return[listnew];
+  !];
+
+  !
+  ! ArrayFlatten[{{m11,m12,...}}] tmp only
+  ! creates a single flattened matrix from a matrix of matrices
+  !  
+  ArrayFlatten[list_] := Module[
+    {listnew}, 
+	listnew = Map[Flatten[#] &, Thread[list[[1]]]];
+    Return[listnew];
+  ];
+  
+  !
+  ! ArrayFlatten2[{{m11,m12,...},{m21,m22,...},...}]
+  ! creates a single flattened matrix from a matrix of matrices
+  !  
+  ArrayFlatten2[list_] := Module[
+    {Mtmp,Mnew}, 
+    Mtmp=Map[Transpose[ArrayFlatten[{#}]]&,list];
+	Mnew=Transpose[ArrayFlatten[{Mtmp}]];
+	Return[Mnew];
+  ];
+  
+  
+  !
+  ! Total[list]
+  ! gives the total of the elements in 1D list
+  !
+  Total[list_] := Module[
+    {},
+    !Sum[list[[i]], {i, Length[list]}]
+	Plus@@list
+  ];
+  
+  
+  !
+  ! Mean[list]
+  ! 
+  Mean[list_]:=Module[
+    {sum,mean},
+    sum=0;
+	Do[
+	  sum=sum+list[[i]];
+	  ,{i,1,Length[list]}
+	];
+	mean=sum/Length[list];
+	Return[mean];
+  ];
+  
+  !
+  ! MaxPosi[list]
+  ! get the maximum of a list and its position in the list
+  ! 
+  MaxPosi[list_]:= Module[
+    {max,posi},
+	max=list[[1]];
+	posi=1;
+	Do[
+	  If[max<list[[i]],max=list[[i]];posi=i;]
+	  ,{i,1,Length[list]}
+	];
+    Return[{max,posi}];
+  ];
+  
+  !
+  ! Total2[list_]
+  ! add the elements along the list
+  !
+  Total2[list_]:=Module[
+    {s,ls},
+	  s=0;
+	  ls=Table[0,{Length[list]}];
+	  Do[
+	    s= s + list[[i]];
+        ls[[i]]=s;
+	    ,{i,Length[list]}
+	  ];
+	Return[ls];
+  ];
+  
+  !----------------------------------------------------------------------------------
+  ! Functions as defined in MATLAB 
+  !----------------------------------------------------------------------------------
+   
+  ! 
+  ! MeshGrid2D[x,y]
+  ! replicates the grid vectors x and y to produce the coordinates of a rectangular 
+  ! grid (xx, yy). The grid vector x is replicated Length[y] times to the vector xx 
+  ! (replicate whole x). The grid vector y is replicated Length[x] times to the 
+  ! vector yy (replicate each element of y).
+  !
+  MeshGrid2D[x_, y_] := Module[
+    {xtmp, ytmp, xx, yy}, 
+    xtmp = Table[x, {Length[y]}];
+    ytmp = Table[y, {Length[x]}];
+	xx=Flatten[xtmp];
+	yy=Flatten[Transpose[ytmp]];	
+    Return[{xx, yy}];
+  ];   
+  
+  !  
+  ! MaxMat[M]
+  ! get maximum and the corresponding position for each column of input matrix
+  !
+  !MaxMat[M_] := Module[
+  !  {max, posi},
+  !  max = Map[Max[#] &, Transpose[M]];
+  !  posi = Flatten[Map[Position[#[[1]], #[[2]]] &, Thread[{Transpose[M], max}]]];
+  !  Return[{max, posi}];
+  !];
+
+  !  
+  ! MaxMat[M]
+  ! get maximum and the corresponding position for each column of input matrix
+  !
+  MaxMat[M_] := Module[
+    {max,posi},
+	{max,posi}=Transpose[Map[MaxPosi[#]&, Transpose[M]]];
+	Return[{max,posi}];
+  ];
+  
+  !
+  ! FFT function as defined in MATLAB
+  ! get fft with each column of input matrix
+  ! with fourier transformation fomular when FourierParameters->{1,-1}
+  !
+  FFTMat[M_] := Module[
+    {Mtemp,n,Mfft},
+	Mtemp=Transpose[Conjugate[M]];
+	n=Dimensions[M][[1]];
+	Mfft=Transpose[ Map[ Conjugate[ Sqrt[n]*Fourier[#]]& , Mtemp]];
+	Return[Mfft];
+  ];
+  
+  !
+  ! ArrayMultMat[M1_, M2_]
+  ! element-by-element multiplication
+  ! M1 and M2 are matrices and have the same dimensions.
+  ! 
+  ArrayMultMat[M1_, M2_] := Module[
+    {Mnew}, 
+    Mnew=Transpose[Thread[M1*M2]];
+	Return[Mnew];
+  ];
+
+  !----------------------------------------------------------------------------------
+  ! Functions based on SAD FFS-dedicated-functions
+  !----------------------------------------------------------------------------------  
+
+  Tune[dp_:0,elm_:"$$$"]:=Module[
+    {tune},
+	DP0=dp;
+	FFS["CALC"];
+	tune=Twiss[{"NX","NY"},elm]/2/Pi;
+	DP0=0;
+	Return[tune];
+  ];
+  
+  Disp[dp_:0,elm_:"$$$"]:=Module[
+    {disp},
+	DP0=dp;
+	FFS["CALC"];
+	disp=Twiss[{"EX","EPX","EY","EPY"},elm];
+	DP0=0;
+	Return[disp];
+  ];
+  
+  Beta[dp_:0,elm_:"$$$"]:=Module[
+    {beta},
+	DP0=dp;
+	FFS["CALC"];
+	beta=Twiss[{"BX","BY"},elm];
+	DP0=0;
+	Return[beta];
+  ];
+
+  Alfa[dp_:0,elm_:"$$$"]:=Module[
+    {alfa},
+	DP0=dp;
+	FFS["CALC"];
+	alfa=Twiss[{"AX","AY"},elm];
+	DP0=0;
+	Return[alfa];
+  ];
+
+  Chroms[dp_:0,elm_:"$$$"]:=Module[
+    {chrom1},
+	chrom1=(Tune[dp+1.0E-6,elm]-Tune[dp,elm])/1.0E-6;
+	DP0=0;
+	Return[chrom1];
+  ];
+
+  
+  !
+  ! TwissfP[dp_:0,elm_:"$$$"]
+  ! get twiss for plot
+  !
+  TwissfP[dp_:0,elm_:"$$$"]:=Module[
+    {tune,disp,beta,alfa},
+	DP0=dp;
+	FFS["CALC"];
+	tune=Twiss[{"NX","NY"},elm]/2/Pi;
+	beta=Twiss[{"BX","BY"},elm];
+	alfa=Twiss[{"AX","AY"},elm];
+	disp=Twiss[{"EX","EPX","EY","EPY"},elm];
+	DP0=0;
+	Return[{tune,beta,alfa,disp}];
+  ];
+  
+  !
+  ! plot twiss at certain element
+  !
+  PlotTwiss[dpp_:Range[-5,5]/5*0.02, elm_:"$$$", DPP_:0.03]:= Module[
+    {tune0,beta0,alfa0,disp0,data,data1,data2,data3,data4,
+	data1x,data2x,data3x,data4x,data1y,data2y,data3y,data4y},
+
+    !
+    ! Get the list tune, beta, alfa, disp
+    !	
+    {tune0,beta0,alfa0,disp0}=TwissfP[0,elm];	
+    data=Map[(TwissfP[#,elm])&,dpp];                ! conflict with RDT.sad. need to be check
+    data1=Map[(#-tune0) &, data[[,1]]];
+    data2=Map[((#-beta0)/beta0) &, data[[,2]]];
+    data3=data[[,3]];
+    data4=data[[,4]];
+
+	!
+	! Get the list {dpp, tune} and {dpp, beta}
+	!
+	data1x=Map[(Thread[List[#[[1]], #[[2]][[1]]] ]) &, Thread[{dpp, data1}]];
+	data1y=Map[(Thread[List[#[[1]], #[[2]][[2]]] ]) &, Thread[{dpp, data1}]];
+	data2x=Map[(Thread[List[#[[1]], #[[2]][[1]]] ]) &, Thread[{dpp, data2}]];
+	data2y=Map[(Thread[List[#[[1]], #[[2]][[2]]] ]) &, Thread[{dpp, data2}]];
+	data3x=Map[(Thread[List[#[[1]], #[[2]][[1]]] ]) &, Thread[{dpp, data3}]];
+	data3y=Map[(Thread[List[#[[1]], #[[2]][[2]]] ]) &, Thread[{dpp, data3}]];
+	data4x=Map[(Thread[List[#[[1]], #[[2]][[1]]] ]) &, Thread[{dpp, data4}]];
+	data4y=Map[(Thread[List[#[[1]], #[[2]][[2]]] ]) &, Thread[{dpp, data4}]];
+
+
+	Show[
+		ListPlot[data1x, FrameLabel -> {"dp/p", "dQ"}, PlotJoined -> True, PlotRange -> {{-DPP,DPP},{-0.3,0.3}}, PointColor->"Blue",PlotColor->"Blue"],
+		ListPlot[data1y, FrameLabel -> {"dp/p", "dQ"}, PlotJoined -> True, PlotRange -> {{-DPP,DPP},{-0.3,0.3}}, PointColor->"Red",PlotColor->"Red"]
+	];
+	TkWait[];
+
+	Show[
+		ListPlot[data2x, FrameLabel -> {"dp/p", "db/b"}, PlotJoined -> True, PlotRange -> {{-DPP,DPP},{-0.5,2}}, PointColor->"Blue",PlotColor->"Blue"],
+		ListPlot[data2y, FrameLabel -> {"dp/p", "db/b"}, PlotJoined -> True, PlotRange -> {{-DPP,DPP},{-0.5,2}}, PointColor->"Red",PlotColor->"Red"]
+	];
+	TkWait[];
+
+	Show[
+		ListPlot[data3x, FrameLabel -> {"dp/p", "da"}, PlotJoined -> True, PlotRange -> {{-DPP,DPP},{-10,10}}, PointColor->"Blue",PlotColor->"Blue"],
+		ListPlot[data3y, FrameLabel -> {"dp/p", "da"}, PlotJoined -> True, PlotRange -> {{-DPP,DPP},{-10,10}}, PointColor->"Red",PlotColor->"Red"]
+	];
+	TkWait[];
+
+	Show[
+		ListPlot[data4x, FrameLabel -> {"dp/p", "de"}, PlotJoined -> True, PlotRange -> {{-DPP,DPP},{-0.1,0.1}}, PointColor->"Blue",PlotColor->"Blue"],
+		ListPlot[data4y, FrameLabel -> {"dp/p", "de"}, PlotJoined -> True, PlotRange -> {{-DPP,DPP},{-0.1,0.1}}, PointColor->"Red",PlotColor->"Red"]
+	];
+	TkWait[];
+
+  ];
+  
+
+  !
+  !  Dynamic aperture survey,
+  !  n is the number of angles tracked,
+  !  each angle corresponds to a certain action ratio Jy/Jx.
+  !  for each Jx/Jy pair, (x,px) and (y, py) corresponds to 
+  !  the phase angles \pi=0.
+  !  The function returns a list of dynamic aperture boundaries,
+  !  Which can then be plotted using MATHEMATICA or other programs.
+  !  Refer to the SAD user manual:
+  !  acc-physics.kek.jp/SAD/SADHelp.html
+  !
+  DAScore[n_, turn_, A_, B_, zrange_, sigma2mX_, sigma2mY_]:=Module[
+      
+      {data0, data1},
+      data0=Map[(a=DynamicApertureSurvey[{{0,A*Cos[Pi*#]},{0,B*Sin[Pi*#]},zrange},turn,Output->6][[2,2,;;,2]];Print[a];List[a/50, (A*Cos[Pi*#])*sigma2mX, (B*Sin[Pi*#])*sigma2mY ])&,Range[0,n]/n];      
+      !Print[data0];
+      data1=Map[(Thread[List[#[[1]]*#[[2]],#[[1]]*#[[3]]]])&,data0];
+      data1
+  ];
+
+
+  !
+  ! R2by2[b1,b2,a1,a2,dn]
+  ! Get transfer matrix of 2 by 2
+  !
+  R2by2[b1_,b2_,a1_,a2_,dn_]:=Module[
+    {R11,R12,R21,R22,R},
+
+    R11=Sqrt[b2/b1]*(Cos[dn]+a1*Sin[dn]);
+    R12=Sqrt[b2*b1]*(Sin[dn]);
+    R21=-((1+a1*a2)*Sin[dn]+(a2-a1)*Cos[dn])/Sqrt[b2*b1];
+    R22=Sqrt[b1/b2]*(Cos[dn]-a2*Sin[dn]);
+    R={{R11,R12},{R21,R22}};
+    Return[R];
+  ];
+
+  !
+  ! GetR4by4[dp,ele1,ele2]
+  ! Get transfer matrix of 4 by 4
+  !
+  GetR4by4[dp_,ele1_,ele2_]:=Module[
+    {bx1,by1,ax1,ay1,nx1,ny1,
+     bx2,by2,ax2,ay2,nx2,ny2,
+     dnx,dny,Rx,Ry,R},
+  
+    DP0=dp;FFS["CALC"];DP0=0;
+    {bx1,by1,ax1,ay1,nx1,ny1}=Twiss[{"BX","BY","AX","AY","NX","NY"},ele1];
+    {bx2,by2,ax2,ay2,nx2,ny2}=Twiss[{"BX","BY","AX","AY","NX","NY"},ele2];
+    dnx=nx2-nx1;
+    dny=ny2-ny1;
+  
+    !Print[{bx1,by1,ax1,ay1,nx1,ny1}];
+    !Print[{bx2,by2,ax2,ay2,nx2,ny2}];
+    !Print[bx1/bx2," ",bx1*bx2," ",(nx2-nx1)/2/Pi];
+    !Print[by1/by2," ",by1*by2," ",(ny2-ny1)/2/Pi];
+
+    Rx=R2by2[bx1,bx2,ax1,ax2,dnx];
+    Ry=R2by2[by1,by2,ay1,ay2,dny];
+    R=ArrayFlatten2[{{Rx,Table[0,{2},{2}]},{Table[0,{2},{2}],Ry}}];
+  
+    !Print[TableForm[Rx]];
+    !Print[TableForm[Ry]];
+    Print[TableForm[R]];
+  
+    Return[R];
+  ];
+  
+  !
+  ! DumpLine[file,name]
+  ! define function to dump a beamline "name" to file "file"
+  !
+  DumpLine[file_,name_]:=Module[{f,b},
+    b=ExtractBeamLine[];
+    f=OpenWrite[file];
+    FFS["output "//f//" type"];
+    Write[f," LINE "//name//" = "];
+    WriteBeamLine[f,b,Format->"MAIN"];
+    Write[f," ;"];
+    !Write[f," FSHIFT = "//FSHIFT//";"];
+    !Write[f,""];
+    Write[f," MOMENTUM = "//MOMENTUM//";"];
+    Write[f,""];
+    !Write[f," MINCOUP = "//MINCOUP//";"];
+    !Write[f,""];
+    !Write[f," PBUNCH = "//PBUNCH//";"];
+    !Write[f,""];
+    !Write[f,"FFS USE="//name//";"];
+    !Write[f,""];
+    !Write[f,"INS;CALC;"];
+    !Write[f,""];
+    Close[f];
+  ];
+
+  !
+  ! EmittX[F_, Jx_, gamma_, theta_]
+  ! define function to get horizontal emittance
+  !
+  EmittX[F_, Jx_, gamma_, theta_] := Module[
+    {Cq, ex},
+    Cq = 3.83*10^-13;
+    ex = F*Cq*gamma^2*theta^3/Jx
+    !Return[ex];
+  ];
+  
+  !
+  ! Ftype[type_, mu_]
+  ! define function to get type factor for EmittX[] 
+  !
+  Ftype[type_, mu_] := Module[
+    {F},
+	If[
+	  type=="FODO",
+	  F=(1-3/4*Sin[mu/2]^2)/(Sin[mu/2]^3)/(Cos[mu/2])
+	]
+	!Return[F];
+  ];
+  
+  !
+  ! op[nm_:"Q*|B*",begin_:"1",end_:"-1"]
+  ! plot twiss functions of a beamline
+  !
+  op[nm_:"Q*|B*",begin_:"1",end_:"-1"]:=(gop=OpticsPlot[{{"BX","BY"},{"EX","EY"},{"NX","NY"}},Names->nm,
+                  GridLines->{Automatic,Automatic}, Region->{begin, end} ];Update[]); ! ":" means default elements are "Q*|B*"
+				  
+				  
+  ! 
+  ! ExtBL[StartElement_,EndElement_]
+  ! extract a beamline
+  ExtBL[StartElement_,EndElement_]:= Module[
+    {},
+  
+    Take[ExtractBeamLine[],{LINE["POSITION",StartElement],LINE["POSITION",EndElement]}]
+  
+  ];
+
+  !
+  ! SAD To MAD
+  !
+  SAD2MAD[file_] := Module[
+    {f,nele,ls,eletype,Nele},
+    
+	f=OpenWrite[file];
+	
+	!
+	! get the indexes for {"DRIFT","BEND","QUAD","SEXT","MARK","CAVI"} in orders
+	!
+	nele=Element["LENGTH"];
+    ls=Table[{},{i,6}];
+    Do[
+      eletype=Element["TYPENAME",i];
+      elenm=Element["NAME",i];
+      
+      Switch[
+        {eletype},
+		
+        {"DRIFT"},
+	    ls[[1]]=Append[ls[[1]],i];,
+  	    {"BEND"},
+	    ls[[2]]=Append[ls[[2]],i];,
+	    {"QUAD"},
+	    ls[[3]]=Append[ls[[3]],i];,
+	    {"SEXT"},
+	    ls[[4]]=Append[ls[[4]],i];,
+	    {"MARK"},
+                 ls[[5]]=Append[ls[[5]],i];,
+	    {"CAVI"},
+	    ls[[6]]=Append[ls[[6]],i];
+      ];  
+	  ,{i,nele}
+    ];
+	Print[ls];
+	
+	!
+	! print the elements
+	!	
+	Do[
+      	  
+	  eletype=Element["TYPENAME",ls[[j,1]]];
+	  Print["\n",eletype,":"];
+	  Map[Print[#," ",Element["NAME",#]]&,ls[[j]]];
+      Write[f,"\n"];
+	  
+      Switch[
+        {eletype},
+		
+        {"DRIFT"},
+		Map[ Write[f,Element["NAME",#],": ","DRIFT",", ","L= ",Element["L",#]
+		                                            ] &, ls[[j]] ];,
+
+  	    {"BEND"},
+        Map[ Write[f,Element["NAME",#],": ","SBEND",", ","L= ",Element["L",#],
+		                                            ", ","ANGLE= ",Element["ANGLE",#],", &\n",
+		                                            "  ","E1= ",Element["E1",#]*Element["ANGLE",#],
+													", ","E2= ",Element["E2",#]*Element["ANGLE",#]
+													] &, ls[[j]] ];,
+		
+	    {"QUAD"},
+		Map[ If[ Element["L",#]>0, Write[f,Element["NAME",#],": ","QUADRUPOLE",", ","L= ",Element["L",#],", ","K1=",Element["K1",#]/Element["L",#]], 
+                                   Write[f,Element["NAME",#],": ","MULTIPOLE",", ","K1L=",Element["K2",#]] ] &, ls[[j]] ];,
+		
+	    {"SEXT"},
+		Map[ If[ Element["L",#]>0, Write[f,Element["NAME",#],": ","SEXTUPOLE",", ","L= ",Element["L",#],", ","K2=",Element["K2",#]/Element["L",#]], 
+                                   Write[f,Element["NAME",#],": ","MULTIPOLE",", ","K2L=",Element["K2",#]] ] &, ls[[j]] ];,
+
+	    {"MARK"},
+		Map[ Write[f,Element["NAME",#],": ","MARKER"] &, ls[[j]] ];,
+
+	    {"CAVI"},
+		Map[ Write[f,Element["NAME",#],": ","RFCAVITY",", ","L= ",Element["L",#],
+		                                               ", ","VOLT= ",Element["VOLT",#]/1E6,
+													   ", ","LAG= 0.5",
+													   ", ","HARMON= ",Round[Element["FREQ",#]/(SpeedOfLight/LINE["S",-1])]
+													   ] &, ls[[j]] ];,
+	    {"MULT"},
+		Map[ Write[f,Element["NAME",#],": ","RBEND",", ","L= ",Element["L",#],", ","K1=",Element["K1",#]/Element["L",#],", ","K2=",Element["K2",#]/Element["L",#]  
+                                                                       ] &, ls[[j]] ];
+
+      ];
+	  ,{j,Length[ls]}
+	];
+    
+	
+	!
+	! print the beamline
+	!
+	Write[f,"\n"];
+	Write[f,blnm,": LINE= ( &"];
+	Nele=LINE["POSITION",-1]-1;
+	Do[
+      Write[f,LINE["ELEMENT",6*(i-1)+1],", ",LINE["ELEMENT",6*(i-1)+2],", ",LINE["ELEMENT",6*(i-1)+3],", ",LINE["ELEMENT",6*(i-1)+4],", ",LINE["ELEMENT",6*(i-1)+5],", ",LINE["ELEMENT",6*(i-1)+6],", ","&" ]; 
+	  ,{i,Floor[Nele/6]}
+	];
+    If[
+	  Floor[Nele/6]*6<Nele,
+      Do[
+        Write[f,LINE["ELEMENT",i],", ","&" ]; 
+	    ,{i,Floor[Nele/6]*6+1,Nele}
+	  ];
+	];
+	Write[f,")"];
+	
+	Close[f];
+	
+	Print["\n"];
+	Print["Elements number: ",nele];
+	Print["Elements number of the beamline: ",Nele];
+	Print["\"SAD\" lattice converted to \"MAD\" one"];
+
+  ];
+
+  !
+  ! SAD To LEGO
+  !
+  SAD2LEGO[file_] := Module[
+    {},
+  ];
+  
+  
+  !
+  ! SAD To MADX
+  !
+  SAD2MADX[file_] := Module[
+    {},
+  ];
+
+  !
+  ! RadInt[nslice_]
+  ! get radiation integration
+  ! CALC should be called in advance
+  !
+  RadInt[nslice_]:= Module[
+    { 
+	  nele,islice,nelenew,
+	  idold,idnew,name,type,ss,ll,k0,btx,bty,afx,afy,etx,ety,etpx,etpy,gamx,gamy,
+	  I2,I5x,
+	  fn
+	},
+
+    nele=LINE["POSITION","$$$"];
+	
+    idold={};
+	idnew={};
+	name={};
+	type={};
+	ss={};
+	ll={};
+	k0={};
+	btx={};
+	bty={};
+	afx={};
+	afy={};
+	etx={};
+	ety={};
+	etpx={};
+	etpy={};
+	gamx={};
+    gamy={};	
+
+	Do[
+	  If[
+	    LINE["ANGLE",i]<>0, 
+        Do[
+          
+		  islice=i+(j-1/2)/nslice;
+ 
+          idold=Append[idold,i];
+	      idnew=Append[idnew,islice];
+	      name=Append[name,LINE["NAME",i]];
+	      type=Append[type,LINE["TYPENAME",i]];
+	      ss=Append[ss,LINE["S",i]+LINE["L",i]*(islice-i)]; ! position of slice center
+		  ll=Append[ll,LINE["L",i]/nslice];
+		  k0=Append[k0,LINE["ANGLE",i]/LINE["L",i]];  ! if only bend in x-plane
+	      btx=Append[btx,Twiss["BX",islice]];
+	      bty=Append[bty,Twiss["BY",islice]];
+	      afx=Append[afx,Twiss["AX",islice]];
+	      afy=Append[afy,Twiss["AY",islice]];		  
+	      etx=Append[etx,Twiss["EX",islice]];
+	      ety=Append[ety,Twiss["EY",islice]];
+		  etpx=Append[etpx,Twiss["EPX",islice]];
+		  etpy=Append[etpy,Twiss["EPY",islice]]; 
+		  
+		  ,{j,nslice}
+	    ];
+	  ];
+	  ,{i,nele}
+	];
+
+	nelenew=Length[idnew];!Print[nelenew];
+	
+	gamx=(1+afx^2)/btx;
+	gamy=(1+afy^2)/bty;
+	hx=btx*etpx^2+2*afx*etx*etpx+gamx*etx^2;
+	hy=bty*etpy^2+2*afy*ety*etpy+gamy*ety^2;
+	
+	I2=Total2[k0^2*ll];
+	I5x=Total2[Abs[k0]^3*hx*ll];
+    
+	!
+	! output result to file
+	!
+	fn=OpenWrite["RadInt.dat"];
+	data=Transpose[{ss,name,type,ll,k0,hx,hy,I2,I5x}];
+    WriteString[fn,"# 1 ss, 2 name, 3 type, 4 ll, 5 k0, 6 hx, 7 hy, 8 I2, 9 I5x","\n\n"];
+    WriteString[fn,TableForm[data],"\n"];
+    Close[fn];
+	
+    Return[{ss,ll,k0,hx,I2,I5x}];
+	
+  ];
+
+				  
+				  
