@@ -383,7 +383,7 @@ def to_gmad(seq: List[Element], path: str) -> None:
                 f.write(f"! {el.name} of type {el.sad_type} not converted\n")
         f.write("\n")
     with open(path+'_beam.gmad', 'w') as f:
-        f.write(f"beam: particle = \"e-\", energy = 120.0*GeV, distrType = \"reference\", ! "+el.name+", "+str(el.start_s)+" m\n")
+        f.write(f"beam, particle = \"e-\", energy = 120.0*GeV, distrType = \"reference\", ! "+el.name+", "+str(el.start_s)+" m\n")
         #for el in seq:
         #    if el.sad_type == 'MARK':
         #        f.write(f"  {el.name.lower()};\n")
