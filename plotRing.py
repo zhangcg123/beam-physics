@@ -371,7 +371,6 @@ def to_gmad(seq: List[Element], path: str) -> None:
     readyname = []
     with open(path+'_components.gmad', 'w') as f:
         for el in seq:
-            readyname.append(el.name.lower())
             if el.sad_type == 'MARK':
                 f.write(f"! {el.name.lower()}: marker; ! at s={el.start_s:.3f} m\n")
             if el.gmad_string:
@@ -379,22 +378,24 @@ def to_gmad(seq: List[Element], path: str) -> None:
                     f.write(f"! {el.gmad_string} ! Duplicate name, skipped\n")
                 else:
                     f.write(el.gmad_string + "\n")
+                    readyname.append(el.name.lower())
             else:
                 f.write(f"! {el.name} of type {el.sad_type} not converted\n")
         f.write("\n")
     with open(path+'_beam.gmad', 'w') as f:
-        f.write(f"beam, particle = \"e-\", energy = 120.0*GeV, distrType = \"reference\", ! "+el.name+", "+str(el.start_s)+" m\n")
+        f.write(f"beam, particle=\"e-\", energy = 120.0*GeV, distrType = \"gauss\";\n")
         #for el in seq:
         #    if el.sad_type == 'MARK':
         #        f.write(f"  {el.name.lower()};\n")
         #    else:
         #        continue
     with open(path+'_line.gmad', 'w') as f:
-        line_str = ", ".join(el.name.lower() for el in seq)
+        line_str = ", ".join(el.name.lower() for el in seq if el.sad_type.upper() != "MARK" and el.sad_type.upper() != "SOL" and el.params.get("L", 0.0) != 0.0)
         f.write(f"ring: line = ({line_str});\n")
         f.write("use, period = ring;\n")
     with open(path+'_options.gmad', 'w') as f:
         f.write("! to be filled as needed\n")
+        f.write("option, ngenerate=100, physicsList=\"synch_rad\";\n")
     with open(path+'.gmad', 'w') as f:
         f.write(f"include {path}_components.gmad;\n")
         f.write(f"include {path}_beam.gmad;\n")
@@ -410,10 +411,10 @@ def process_arc(seq: List[Element], out_path: str) -> List[Element]:
     far_distance = 0.0
     far_idx = -1
     for i, el in enumerate(seq):
-        if el.sad_type == 'MARK' and el.start_s < near_distance and el.start_s > 100:# the ip is mark sad type
+        if el.sad_type == 'MARK' and el.start_s < near_distance and el.start_s > 10:# the ip is mark sad type
             near_distance = el.start_s
             near_idx = i
-        if el.sad_type == 'MARK' and el.start_s > far_distance and el.start_s < 99285.752-300:
+        if el.sad_type == 'MARK' and el.start_s > far_distance and el.start_s < 99285.752-500:
             far_distance = el.start_s
             far_idx = i
 
