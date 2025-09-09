@@ -9,6 +9,9 @@ from typing import Dict, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 
+with open('beam_param_map.json', 'r') as f:
+    beam_param_map = json.load(f)
+
 # Recognize SAD blocks and definitions
 BLOCK_HEADER_RE = re.compile(
     r"^\s*(DRIFT|BEND|QUAD|SEXT|MARK|MULT|SOL|CAVI|APERT)\b",
@@ -120,17 +123,9 @@ def color_for_type(sad_type: str) -> str:
         return "#bbbbbb"  # light gray
     return "#000000"      # default black
 
-
-    # Draw an arc along the circle between theta0 and theta1
-    # Ensure theta0 < theta1
-    if theta1 < theta0:
-        theta0, theta1 = theta1, theta0
-    n = max(8, int(200 * (theta1 - theta0) / (2*np.pi)))
-    theta = np.linspace(theta0, theta1, n)
-    x = R * np.cos(theta)
-    y = R * np.sin(theta)
-    ax.plot(x, y, color=color, linewidth=lw, solid_capstyle="butt", zorder=z)
-
+def beamparams_convt(param_name: str) -> str:
+    return beam_param_map[param_name]
+    
 def build_sequence(model: SadModel, line_name: str) -> List[Element]:
     if line_name not in model.lines:
         raise RuntimeError(f"LINE '{line_name}' not found in the SAD file.")
@@ -176,151 +171,67 @@ def process_ring(model: SadModel, line_name: str, out_path: str) -> List[Element
         alpha=0.5,
         label="Elements"
     )
+    # highlight marks
+    mrk_x = [el.global_x for el in seq if el.sad_type.upper() == "MARK"]
+    mrk_y = [el.global_y for el in seq if el.sad_type.upper() == "MARK"]
+    mrk_n = [el.name for el in seq if el.sad_type.upper() == "MARK"]
+    plt.scatter(
+        mrk_x,
+        mrk_y,
+        s=10,
+        c="red",
+        alpha=1,
+        label="MARK"
+    )
+    for i, name in enumerate(mrk_n):
+        plt.text(mrk_x[i], mrk_y[i], name, fontsize=6, ha='right', va='bottom', rotation=30)
     plt.xlabel("X (m)")
     plt.ylabel("Y (m)")
-    plt.title(f"Ring Layout: {line_name}")
+    #plt.title(f"Ring Layout: {line_name}")
     ax = plt.gca()
     ax.text(
         0.02, 0.98,
-        f"Length={sum(el.params.get('L', 0.0) for el in seq):.1f}  Angle={sum(el.params.get('ANGLE', 0.0) for el in seq):.3f} rad\n"
-        f"Elements={len(seq)}  NBend={sum(1 for el in seq if el.sad_type.upper()=='BEND')}\n"
-        f"NQuad={sum(1 for el in seq if el.sad_type.upper()=='QUAD')}\n"
-        f"NSext={sum(1 for el in seq if el.sad_type.upper()=='SEXT')}\n"
-        f"NDrift={sum(1 for el in seq if el.sad_type.upper()=='DRIFT')}\n"
-        f"NMult={sum(1 for el in seq if el.sad_type.upper()=='MULT')}\n"
-        f"NCavi={sum(1 for el in seq if el.sad_type.upper()=='CAVI')}\n"
-        f"NSol={sum(1 for el in seq if el.sad_type.upper()=='SOL')}\n"
-        f"NMark={sum(1 for el in seq if el.sad_type.upper()=='MARK')}",
+        f"NElE={len(seq)}  NBEND={sum(1 for el in seq if el.sad_type.upper()=='BEND')}\n"
+        f"NQUA={sum(1 for el in seq if el.sad_type.upper()=='QUAD')}\n"
+        f"NSEXT={sum(1 for el in seq if el.sad_type.upper()=='SEXT')}\n"
+        f"NDRIFT={sum(1 for el in seq if el.sad_type.upper()=='DRIFT')}\n"
+        f"NMULT={sum(1 for el in seq if el.sad_type.upper()=='MULT')}\n"
+        f"NCAVI={sum(1 for el in seq if el.sad_type.upper()=='CAVI')}\n"
+        f"NSOL={sum(1 for el in seq if el.sad_type.upper()=='SOL')}\n"
+        f"NMARK={sum(1 for el in seq if el.sad_type.upper()=='MARK')}\n"
+        f"DEBUG: Tot. L={sum(el.params.get('L', 0.0) for el in seq):.3f}  Tot. angle/2={sum(el.params.get('ANGLE', 0.0)/2. for el in seq):.6f} rad\n"
+        f"          Begin: {seq[0].name}, {seq[0].sad_type}, s={seq[0].start_s:.3f}, x={seq[0].global_x:.3f}, y={seq[0].global_y:.3f}\n"
+        f"          End: {seq[-1].name}, {seq[-1].sad_type}, s={seq[-1].start_s:.3f}, x={seq[-1].global_x:.3f}, y={seq[-1].global_y:.3f}",
         transform=ax.transAxes, fontsize=8, va="top", ha="left"
     )
-    plt.axis('equal')
     plt.savefig('debug_ring.png', dpi=300)
     plt.clf()
-    print ( 'The end point: x=', seq[-1].global_x, ', y=', seq[-1].global_y )
-    return seq 
+    print ( 'The starting point name: ', seq[0].name, ' type: ', seq[0].sad_type, ' at s= ', seq[0].start_s, ' x= ', seq[0].global_x, ' y= ', seq[0].global_y )
+    print ( 'The ending point name: ', seq[-1].name, ' type: ', seq[-1].sad_type, ' at s= ', seq[-1].start_s, ' x= ', seq[-1].global_x, ' y= ', seq[-1].global_y )
     '''
-    b_xs = []
-    b_ys = []
-    m_xs = []
-    m_ys = []
-    d_xs = []
-    d_ys = []
-    o_xs = []
-    o_ys = []
-    r_xs = []
-    r_ys = []
-    k_xs = []
-    k_ys = []
-    s_xs = []
-    s_ys = []
-    for i in range(len(types)):
-        if xs[i] < -1000 or xs[i] > 1000 or ys[i] < -20 or ys[i] > 20:
-            continue
-        t = types[i].upper()
-        if t == "BEND":
-            b_xs.append(xs[i])
-            b_ys.append(ys[i])
-        elif t == "DRIFT":
-            d_xs.append(xs[i])
-            d_ys.append(ys[i])
-        elif t == "MULT" or t == "QUAD" or t == "SEXT":
-            m_xs.append(xs[i])
-            m_ys.append(ys[i])
-        elif t == "CAVI":
-            r_xs.append(xs[i])
-            r_ys.append(ys[i])
-        elif t == "MARK":
-            k_xs.append(xs[i])
-            k_ys.append(ys[i])
-        elif t == "SOL":
-            s_xs.append(xs[i])
-            s_ys.append(ys[i])
-        else:
-            o_xs.append(xs[i])
-            o_ys.append(ys[i])
-    fig, axs = plt.subplots(7, 1, figsize=(15, 35), sharex=True)
-    print ( d_xs )
-    # Panel 1: All elements
-    xlim = [-1000,1000]
-    ylim = [-20,20]
-    axs[0].scatter(xs, ys, s=30, alpha=1, c="black", label="All Elements="+str(len(xs)))
-    #axs[0].set_title("All Elements")
-    axs[0].set_ylabel("Y (m)")
-    axs[0].set_xlabel("X (m)")
-    axs[0].grid(True, linestyle='--', alpha=0.5)
-    #axs[0].set_aspect('equal', adjustable='box')
-    axs[0].legend(markerscale=2)
-    axs[0].set_xlim(xlim)
-    axs[0].set_ylim(ylim)
-
-    axs[1].scatter(d_xs, d_ys, s=30, c=color_for_type("DRIFT"), label="DRIFT="+str(len(d_xs)), alpha=1)
-    #axs[1].set_title("BENDs and DRIFTs")
-    axs[1].set_ylabel("Y (m)")
-    axs[1].legend(markerscale=2)
-    axs[1].grid(True, linestyle='--', alpha=0.5)
-    #axs[1].set_aspect('equal', adjustable='box')
-    axs[1].set_xlim(xlim)
-    axs[1].set_ylim(ylim)
-
-    # Panel 3: BEND
-    axs[2].scatter(b_xs, b_ys, s=30, c=color_for_type("BEND"), label="BEND="+str(len(b_xs)), alpha=1)
-    #axs[2].set_title("BENDs")
-    axs[2].set_ylabel("Y (m)")
-    axs[2].legend(markerscale=2)
-    axs[2].grid(True, linestyle='--', alpha=0.5)
-    #axs[2].set_aspect('equal', adjustable='box')
-    axs[2].set_xlim(xlim)
-    axs[2].set_ylim(ylim)
-
-    # Panel 4: Multipoles
-    axs[3].scatter(m_xs, m_ys, s=20, c=color_for_type("QUAD"), label="Multipoles="+str(len(m_xs)), alpha=1)
-    #axs[3].set_title("Multipoles (QUAD, SEXT, MULT)")
-    axs[3].set_ylabel("Y (m)")
-    axs[3].set_xlabel("X (m)")
-    axs[3].legend(markerscale=2)
-    axs[3].grid(True, linestyle='--', alpha=0.5)
-    #axs[3].set_aspect('equal', adjustable='box')
-    axs[3].set_xlim(xlim)
-    axs[3].set_ylim(ylim)
-
-    # Panel 5: for CAVIs
-    axs[4].scatter(r_xs, r_ys, s=20, c=color_for_type("CAVI"), label="CAVI="+str(len(r_xs)), alpha=1)
-    #axs[4].set_title("CAVIs")
-    axs[4].set_ylabel("Y (m)")
-    axs[4].set_xlabel("X (m)")
-    axs[4].legend(markerscale=2)
-    axs[4].grid(True, linestyle='--', alpha=0.5)
-    #axs[4].set_aspect('equal', adjustable='box')
-    axs[4].set_xlim(xlim)
-    axs[4].set_ylim(ylim)
-
-    # Panel 6: MARKs
-    axs[5].scatter(k_xs, k_ys, s=20, c=color_for_type("MARK"), label="MARK="+str(len(k_xs)), alpha=1)
-    #axs[5].set_title("MARKs")
-    axs[5].set_ylabel("Y (m)")
-    axs[5].set_xlabel("X (m)")
-    axs[5].legend(markerscale=2)
-    axs[5].grid(True, linestyle='--', alpha=0.5)
-    #axs[5].set_aspect('equal', adjustable='box')
-    axs[5].set_xlim(xlim)
-    axs[5].set_ylim(ylim)
-
-    # Panel 7: SOLs
-    axs[6].scatter(s_xs, s_ys, s=20, c=color_for_type("SOL"), label="SOL="+str(len(s_xs)), alpha=1)
-    #axs[6].set_title("SOLs")
-    axs[6].set_ylabel("Y (m)")
-    axs[6].set_xlabel("X (m)")
-    axs[6].legend(markerscale=2)
-    axs[6].grid(True, linestyle='--', alpha=0.5)
-    #axs[6].set_aspect('equal', adjustable='box')
-    axs[6].set_xlim(xlim)
-    axs[6].set_ylim(ylim)
-    if len(o_xs) > 0:
-        print(f"Warning: There are {len(o_xs)} elements of other types not plotted separately.")
-    plt.tight_layout()
-    plt.savefig(out_path)
+    plt.scatter(
+        [el.global_x for el in seq],
+        [el.global_y for el in seq],
+        s=1,
+        c="blue",
+        alpha=0.5,
+    )
+    plt.scatter(
+        [-1*el.global_x for el in seq],
+        [el.global_y for el in seq],
+        s=1,
+        c="red",
+        alpha=0.5,
+    )
+    plt.xlabel("X (m)")
+    plt.ylabel("Y (m)")
+    plt.xlim(-1500, 1500)
+    plt.ylim(-5, 20)
+    plt.savefig('debug_ring_ip.png', dpi=300)
     plt.clf()
     '''
+    
+    return seq 
 
 def convert(el: Element) -> str:
     t = el.sad_type.upper()
@@ -362,7 +273,6 @@ def convert(el: Element) -> str:
     else:
         return f"! {name} of type {t} not converted"
 
-
 def to_gmad(seq: List[Element], path: str) -> None:
     if path is None:
         return
@@ -371,31 +281,36 @@ def to_gmad(seq: List[Element], path: str) -> None:
     readyname = []
     with open(path+'_components.gmad', 'w') as f:
         for el in seq:
-            if el.sad_type == 'MARK':
-                f.write(f"! {el.name.lower()}: marker; ! at s={el.start_s:.3f} m\n")
             if el.gmad_string:
-                if el.name.lower() in readyname:
-                    f.write(f"! {el.gmad_string} ! Duplicate name, skipped\n")
+                if el.name.lower() in readyname or el.sad_type.upper() == "MARK":
+                    f.write(f"! {el.gmad_string} ! at s={el.start_s:.3f} m -- skip duplicate or skip mark\n")
                 else:
-                    f.write(el.gmad_string + "\n")
+                    f.write(f"{el.gmad_string} ! at s={el.start_s:.3f} m\n")
                     readyname.append(el.name.lower())
             else:
                 f.write(f"! {el.name} of type {el.sad_type} not converted\n")
         f.write("\n")
+    ''' # the beam has been defined properly in the beginning mark
     with open(path+'_beam.gmad', 'w') as f:
-        f.write(f"beam, particle=\"e-\", energy = 120.0*GeV, distrType = \"gauss\";\n")
-        #for el in seq:
-        #    if el.sad_type == 'MARK':
-        #        f.write(f"  {el.name.lower()};\n")
-        #    else:
-        #        continue
+        for el in seq:
+            if el.sad_type == 'MARK' and seq.index(el) == 0:
+                f.write(f"beam, particle=\"e-\", energy = 120.0*GeV, distrType = \"gausstwiss\", ! {el.name}\n")
+                mark_params_str = ',\n'.join(f"    {beam_param_map[k]}={v}" for k, v in el.params.items() if beam_param_map[k] != "")
+                f.write(f"{mark_params_str};\n")
+            elif el.sad_type == 'MARK':
+                f.write(f"!beam, particle=\"e-\", energy = 120.0*GeV, distrType = \"gausstwiss\", ! {el.name}\n")
+                mark_params_str = ',\n'.join(f"!    {beam_param_map[k]}={v}" for k, v in el.params.items() if beam_param_map[k] != "")
+                f.write(f"{mark_params_str};\n")
+            else:
+                continue
+    '''
     with open(path+'_line.gmad', 'w') as f:
         line_str = ", ".join(el.name.lower() for el in seq if el.sad_type.upper() != "MARK" and el.sad_type.upper() != "SOL" and el.params.get("L", 0.0) != 0.0)
         f.write(f"ring: line = ({line_str});\n")
         f.write("use, period = ring;\n")
     with open(path+'_options.gmad', 'w') as f:
         f.write("! to be filled as needed\n")
-        f.write("option, ngenerate=100, physicsList=\"synch_rad\";\n")
+        f.write("option, ngenerate=100, physicsList=\"synch_rad em\";\n")
     with open(path+'.gmad', 'w') as f:
         f.write(f"include {path}_components.gmad;\n")
         f.write(f"include {path}_beam.gmad;\n")
@@ -411,10 +326,10 @@ def process_arc(seq: List[Element], out_path: str) -> List[Element]:
     far_distance = 0.0
     far_idx = -1
     for i, el in enumerate(seq):
-        if el.sad_type == 'MARK' and el.start_s < near_distance and el.start_s > 10:# the ip is mark sad type
+        if el.sad_type == 'MARK' and el.start_s < near_distance and el.start_s > 100:# the ip is mark sad type
             near_distance = el.start_s
             near_idx = i
-        if el.sad_type == 'MARK' and el.start_s > far_distance and el.start_s < 99285.752-500:
+        if el.sad_type == 'MARK' and el.start_s > far_distance and el.start_s < 99285.752-400:
             far_distance = el.start_s
             far_idx = i
 
@@ -424,8 +339,9 @@ def process_arc(seq: List[Element], out_path: str) -> List[Element]:
     else:
         print("Warning: No markers found in the sequence.")
     
-    arc_seq = seq[far_idx+1:] + seq[:near_idx+1]
-
+    arc_seq = seq[far_idx+0:] + seq[:near_idx+1]
+    print (f"the beginning element: {arc_seq[0].name}, the second element: {arc_seq[1].name}, the second last element: {arc_seq[-2].name}, the last {arc_seq[-1].name}")
+    
     plt.scatter(
         [el.global_x for el in arc_seq],
         [el.global_y for el in arc_seq],
@@ -434,13 +350,43 @@ def process_arc(seq: List[Element], out_path: str) -> List[Element]:
         alpha=0.5,
         label="Elements"
     )
+    # highlight marks
+    mrk_x = [el.global_x for el in arc_seq if el.sad_type.upper() == "MARK"]
+    mrk_y = [el.global_y for el in arc_seq if el.sad_type.upper() == "MARK"]
+    mrk_n = [el.name for el in arc_seq if el.sad_type.upper() == "MARK"]
+    plt.scatter(
+        mrk_x,
+        mrk_y,
+        s=10,
+        c="red",
+        alpha=1,
+        label="MARK"
+    )
+    for i, name in enumerate(mrk_n):
+        plt.text(mrk_x[i], mrk_y[i], name, fontsize=6, ha='right', va='bottom', rotation=30)
+    plt.text(0.02, 0.98,
+        f"NElE={len(arc_seq)}  NBEND={sum(1 for el in arc_seq if el.sad_type.upper()=='BEND')}\n"
+        f"NQUA={sum(1 for el in arc_seq if el.sad_type.upper()=='QUAD')}\n"
+        f"NSEXT={sum(1 for el in arc_seq if el.sad_type.upper()=='SEXT')}\n"
+        f"NDRIFT={sum(1 for el in arc_seq if el.sad_type.upper()=='DRIFT')}\n"
+        f"NMULT={sum(1 for el in arc_seq if el.sad_type.upper()=='MULT')}\n"
+        f"NCAVI={sum(1 for el in arc_seq if el.sad_type.upper()=='CAVI')}\n"
+        f"NSOL={sum(1 for el in arc_seq if el.sad_type.upper()=='SOL')}\n"
+        f"NMARK={sum(1 for el in arc_seq if el.sad_type.upper()=='MARK')}\n"
+        f"DEBUG: Tot. L={sum(el.params.get('L', 0.0) for el in arc_seq):.3f}  Tot. angle/2={sum(el.params.get('ANGLE', 0.0)/2. for el in arc_seq):.6f} rad\n"
+        f"          Begin: {arc_seq[0].name}, {arc_seq[0].sad_type}, s={arc_seq[0].start_s:.3f}, x={arc_seq[0].global_x:.3f}, y={arc_seq[0].global_y:.3f}\n"
+        f"          End: {arc_seq[-1].name}, {arc_seq[-1].sad_type}, s={arc_seq[-1].start_s:.3f}, x={arc_seq[-1].global_x:.3f}, y={arc_seq[-1].global_y:.3f}\n"
+        , transform=plt.gca().transAxes, fontsize=8, va="top", ha="left"
+    )
+    plt.xlabel("X (m)")
+    plt.ylabel("Y (m)")
+    #plt.title(f"Arc Layout")
     #plt.xlim(-100, 100)
     #plt.ylim(-10, 10)
     plt.savefig('debug_arc.png', dpi=300)
     plt.clf()
     return arc_seq
     
-
 def main():
     ap = argparse.ArgumentParser(description="Plot a circular ring layout from a SAD lattice LINE.")
     ap.add_argument("--input", "-i", required=True, help="Path to SAD lattice file")
