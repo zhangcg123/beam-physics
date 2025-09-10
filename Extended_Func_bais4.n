@@ -516,16 +516,44 @@
 	Write[f,blnm,": LINE= ( &"];
 	Nele=LINE["POSITION",-1]-1;
 	Do[
-      Write[f,LINE["ELEMENT",6*(i-1)+1],", ",LINE["ELEMENT",6*(i-1)+2],", ",LINE["ELEMENT",6*(i-1)+3],", ",LINE["ELEMENT",6*(i-1)+4],", ",LINE["ELEMENT",6*(i-1)+5],", ",LINE["ELEMENT",6*(i-1)+6],", ","&" ]; 
-	  ,{i,Floor[Nele/6]}
-	];
+  If[
+    Element["TYPENAME", LINE["ELEMENT", 6*(i-1)+1]] != "SOLENOID",
+    Write[f, LINE["ELEMENT", 6*(i-1)+1], ", "]
+  ];
+  If[
+    Element["TYPENAME", LINE["ELEMENT", 6*(i-1)+2]] != "SOLENOID",
+    Write[f, LINE["ELEMENT", 6*(i-1)+2], ", "]
+  ];
+  If[
+    Element["TYPENAME", LINE["ELEMENT", 6*(i-1)+3]] != "SOLENOID",
+    Write[f, LINE["ELEMENT", 6*(i-1)+3], ", "]
+  ];
+  If[
+    Element["TYPENAME", LINE["ELEMENT", 6*(i-1)+4]] != "SOLENOID",
+    Write[f, LINE["ELEMENT", 6*(i-1)+4], ", "]
+  ];
+  If[
+    Element["TYPENAME", LINE["ELEMENT", 6*(i-1)+5]] != "SOLENOID",
+    Write[f, LINE["ELEMENT", 6*(i-1)+5], ", "]
+  ];
+  If[
+    Element["TYPENAME", LINE["ELEMENT", 6*(i-1)+6]] != "SOLENOID",
+    Write[f, LINE["ELEMENT", 6*(i-1)+6], ", "]
+  ];
+  Write[f, "&"];
+  , {i, Floor[Nele/6]}
+];
+
+If[
+  Floor[Nele/6]*6 < Nele,
+  Do[
     If[
-	  Floor[Nele/6]*6<Nele,
-      Do[
-        Write[f,LINE["ELEMENT",i],", ","&" ]; 
-	    ,{i,Floor[Nele/6]*6+1,Nele}
-	  ];
-	];
+      Element["TYPENAME", LINE["ELEMENT", i]] != "SOLENOID",
+      Write[f, LINE["ELEMENT", i], ", ", "&"]
+    ];
+    , {i, Floor[Nele/6]*6+1, Nele}
+  ];
+];
 	Write[f,")"];
 	
 	Close[f];

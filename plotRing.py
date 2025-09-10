@@ -208,7 +208,27 @@ def process_ring(model: SadModel, line_name: str, out_path: str) -> List[Element
     plt.clf()
     print ( 'The starting point name: ', seq[0].name, ' type: ', seq[0].sad_type, ' at s= ', seq[0].start_s, ' x= ', seq[0].global_x, ' y= ', seq[0].global_y )
     print ( 'The ending point name: ', seq[-1].name, ' type: ', seq[-1].sad_type, ' at s= ', seq[-1].start_s, ' x= ', seq[-1].global_x, ' y= ', seq[-1].global_y )
+    # slice by mark and cout the number of other elements types between two marks
+    for i, el in enumerate(seq):
+        if el.sad_type.upper() == "MARK":
+            next_mark_index = [ j for j in range(i+1, len(seq)) if seq[j].sad_type.upper() == "MARK" ]
+            if len(next_mark_index) == 0:
+                next_mark_index = [ jj for jj in range(len(seq)) if seq[jj].sad_type.upper() == "MARK" ][0] # if the i is the last mark, loop back to the first mark
+            else:
+                next_mark_index = next_mark_index[0]
+            count_bend = sum(1 for e in seq[i+1:next_mark_index] if e.sad_type.upper() == "BEND")
+            count_quad = sum(1 for e in seq[i+1:next_mark_index] if e.sad_type.upper() == "QUAD")
+            count_sext = sum(1 for e in seq[i+1:next_mark_index] if e.sad_type.upper() == "SEXT")
+            count_drift = sum(1 for e in seq[i+1:next_mark_index] if e.sad_type.upper() == "DRIFT")
+            count_mult = sum(1 for e in seq[i+1:next_mark_index] if e.sad_type.upper() == "MULT")
+            count_cavi = sum(1 for e in seq[i+1:next_mark_index] if e.sad_type.upper() == "CAVI")
+            count_sol = sum(1 for e in seq[i+1:next_mark_index] if e.sad_type.upper() == "SOL")
+            count_mark = next_mark_index - (i + 1)
+            print(f"From MARK {el.name} at s={el.start_s:.3f} m, to next MARK {seq[next_mark_index].name} at s={seq[next_mark_index].start_s:.3f} m: "
+                  f"{count_bend} BEND, {count_quad} QUAD, {count_sext} SEXT, {count_drift} DRIFT, {count_mult} MULT, "
+                  f"{count_cavi} CAVI, {count_sol} SOL, total {count_mark} elements.")
     '''
+    # debug plot for IP region
     plt.scatter(
         [el.global_x for el in seq],
         [el.global_y for el in seq],
@@ -230,8 +250,7 @@ def process_ring(model: SadModel, line_name: str, out_path: str) -> List[Element
     plt.savefig('debug_ring_ip.png', dpi=300)
     plt.clf()
     '''
-    
-    return seq 
+    return seq # the full sequence 
 
 def convert(el: Element) -> str:
     t = el.sad_type.upper()
@@ -290,7 +309,7 @@ def to_gmad(seq: List[Element], path: str) -> None:
             else:
                 f.write(f"! {el.name} of type {el.sad_type} not converted\n")
         f.write("\n")
-    ''' # the beam has been defined properly in the beginning mark
+    # the beam has been defined properly in the beginning mark
     with open(path+'_beam.gmad', 'w') as f:
         for el in seq:
             if el.sad_type == 'MARK' and seq.index(el) == 0:
@@ -303,7 +322,7 @@ def to_gmad(seq: List[Element], path: str) -> None:
                 f.write(f"{mark_params_str};\n")
             else:
                 continue
-    '''
+    
     with open(path+'_line.gmad', 'w') as f:
         line_str = ", ".join(el.name.lower() for el in seq if el.sad_type.upper() != "MARK" and el.sad_type.upper() != "SOL" and el.params.get("L", 0.0) != 0.0)
         f.write(f"ring: line = ({line_str});\n")
@@ -320,28 +339,21 @@ def to_gmad(seq: List[Element], path: str) -> None:
 
 def process_arc(seq: List[Element], out_path: str) -> List[Element]:
     
-    # the near mark
-    near_distance = 99285.752 # full ring length
-    near_idx = -1
-    far_distance = 0.0
-    far_idx = -1
-    for i, el in enumerate(seq):
-        if el.sad_type == 'MARK' and el.start_s < near_distance and el.start_s > 100:# the ip is mark sad type
-            near_distance = el.start_s
-            near_idx = i
-        if el.sad_type == 'MARK' and el.start_s > far_distance and el.start_s < 99285.752-400:
-            far_distance = el.start_s
-            far_idx = i
+    # arc by names
+    arc_start_name = "MIRD"
+    arc_end_name = "MSTRRDO"
 
-    if near_idx != -1 and far_idx != -1:
-        print(f"Near marker: {seq[near_idx].name} is {seq[near_idx].sad_type} at {seq[near_idx].start_s} m")
-        print(f"Far marker: {seq[far_idx].name} is {seq[far_idx].sad_type} at {99285.752 - seq[far_idx].start_s} m")
-    else:
-        print("Warning: No markers found in the sequence.")
+    start_index = next((i for i, el in enumerate(seq) if el.name == arc_start_name), None)
+    end_index = next((i for i, el in enumerate(seq) if el.name == arc_end_name), None)
     
-    arc_seq = seq[far_idx+0:] + seq[:near_idx+1]
-    print (f"the beginning element: {arc_seq[0].name}, the second element: {arc_seq[1].name}, the second last element: {arc_seq[-2].name}, the last {arc_seq[-1].name}")
-    
+    if start_index is None or end_index is None:
+        raise RuntimeError(f"Arc start or end markers '{arc_start_name}' or '{arc_end_name}' not found in the sequence.")
+    if start_index >= end_index:
+        raise RuntimeError(f"Arc start marker '{arc_start_name}' occurs after end marker '{arc_end_name}' in the sequence.")
+    arc_seq = seq[start_index:end_index + 1]
+    for i, el in enumerate(arc_seq):
+        el.start_s = sum(e.params.get("L", 0.0) for e in arc_seq[:i])
+    print(f"Arc segment from '{arc_start_name}' to '{arc_end_name}' contains {len(arc_seq)} elements.")
     plt.scatter(
         [el.global_x for el in arc_seq],
         [el.global_y for el in arc_seq],
