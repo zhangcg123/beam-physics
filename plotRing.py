@@ -276,7 +276,10 @@ def convert(el: Element) -> str:
         L = el.params.get("L", 0.0)
         knl_str = ','.join(str(el.params.get(f'K{i}', 0.0)/L) for i in range(0, 5))
         ksl_str = ','.join(str(el.params.get(f'SK{i}', 0.0)/L) for i in range(0, 5))
-        return f"{name}: multipole, l={L}*m, knl={{{knl_str}}}, ksl={{{ksl_str}}};"
+        if el.params.get("K1") != 0:
+            return f"{name}: multipole, l={L}*m, knl={{{knl_str}}}, ksl={{{ksl_str}}};"
+        else:
+            return f"{name}: drift, l={L}*m; ! knl={{{knl_str}}}, ksl={{{ksl_str}}};"
     elif t == "CAVI":
         L = el.params.get("L", 0.0)
         VOLTAGE = el.params.get("VOLTAGE", 0.0)
@@ -288,7 +291,7 @@ def convert(el: Element) -> str:
         BZ = el.params.get("BZ", 0.0)
         return f"{name}: solenoid, l={L}*m, B={BZ}*T;"
     elif t == "MARK":
-        return f"! {name}: marker; "+f" ! at s={el.start_s:.3f} m"
+        return f"{name}: marker;"
     else:
         return f"! {name} of type {t} not converted"
 
@@ -302,7 +305,7 @@ def to_gmad(seq: List[Element], path: str) -> None:
         for el in seq:
             if el.gmad_string:
                 if el.name.lower() in readyname or el.sad_type.upper() == "MARK":
-                    f.write(f"! {el.gmad_string} ! at s={el.start_s:.3f} m -- skip duplicate or skip mark\n")
+                    f.write(f"! {el.gmad_string} at s={el.start_s:.3f} m -- skip duplicate or skip mark\n")
                 else:
                     f.write(f"{el.gmad_string} ! at s={el.start_s:.3f} m\n")
                     readyname.append(el.name.lower())
@@ -329,7 +332,8 @@ def to_gmad(seq: List[Element], path: str) -> None:
         f.write("use, period = ring;\n")
     with open(path+'_options.gmad', 'w') as f:
         f.write("! to be filled as needed\n")
-        f.write("option, ngenerate=100, physicsList=\"synch_rad em\";\n")
+        f.write("option, ngenerate=1000, physicsList=\"em\", stopSecondaries=1, aper1=5*cm;\n")
+        #f.write(f"sample, all;\n")
     with open(path+'.gmad', 'w') as f:
         f.write(f"include {path}_components.gmad;\n")
         f.write(f"include {path}_beam.gmad;\n")
@@ -340,12 +344,12 @@ def to_gmad(seq: List[Element], path: str) -> None:
 def process_arc(seq: List[Element], out_path: str) -> List[Element]:
     
     # arc by names
-    arc_start_name = "MIRD"
-    arc_end_name = "MSTRRDO"
+    arc_start_name = "MCCSHIRU"
+    arc_end_name = "MCCSHIRD"
 
-    start_index = next((i for i, el in enumerate(seq) if el.name == arc_start_name), None)
-    end_index = next((i for i, el in enumerate(seq) if el.name == arc_end_name), None)
-    
+    start_index = [i for i, el in enumerate(seq) if el.name == arc_start_name][0]
+    end_index = [i for i, el in enumerate(seq) if el.name == arc_end_name][1]
+
     if start_index is None or end_index is None:
         raise RuntimeError(f"Arc start or end markers '{arc_start_name}' or '{arc_end_name}' not found in the sequence.")
     if start_index >= end_index:
@@ -354,10 +358,11 @@ def process_arc(seq: List[Element], out_path: str) -> List[Element]:
     for i, el in enumerate(arc_seq):
         el.start_s = sum(e.params.get("L", 0.0) for e in arc_seq[:i])
     print(f"Arc segment from '{arc_start_name}' to '{arc_end_name}' contains {len(arc_seq)} elements.")
+    fig = plt.figure(figsize=(6, 6), constrained_layout=True)
     plt.scatter(
         [el.global_x for el in arc_seq],
         [el.global_y for el in arc_seq],
-        s=1,
+        s=30,
         c="black",
         alpha=0.5,
         label="Elements"
@@ -366,10 +371,11 @@ def process_arc(seq: List[Element], out_path: str) -> List[Element]:
     mrk_x = [el.global_x for el in arc_seq if el.sad_type.upper() == "MARK"]
     mrk_y = [el.global_y for el in arc_seq if el.sad_type.upper() == "MARK"]
     mrk_n = [el.name for el in arc_seq if el.sad_type.upper() == "MARK"]
+
     plt.scatter(
         mrk_x,
         mrk_y,
-        s=10,
+        s=30,
         c="red",
         alpha=1,
         label="MARK"
@@ -395,9 +401,9 @@ def process_arc(seq: List[Element], out_path: str) -> List[Element]:
     #plt.title(f"Arc Layout")
     #plt.xlim(-100, 100)
     #plt.ylim(-10, 10)
-    plt.savefig('debug_arc.png', dpi=300)
+    plt.savefig('debug_arc_'+arc_start_name+'_'+arc_end_name+'.png', dpi=300)
     plt.clf()
-    return arc_seq
+    return arc_seq, arc_start_name, arc_end_name
     
 def main():
     ap = argparse.ArgumentParser(description="Plot a circular ring layout from a SAD lattice LINE.")
@@ -411,9 +417,9 @@ def main():
 
     seq = process_ring(model, args.line, "ring_layout.png")
 
-    arc = process_arc(seq, "arc_layout.png")
+    arc, start_name, end_name = process_arc(seq, "arc_layout.png")
     
-    to_gmad(arc, args.to_gmad)
+    to_gmad(arc, args.to_gmad+f"_arc_{start_name}_{end_name}")
 
     if args.to_json:
         save_model(model, args.to_json)
